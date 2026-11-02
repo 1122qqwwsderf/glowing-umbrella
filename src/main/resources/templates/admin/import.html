@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>数据导入 - 信用卡违约预警系统</title>
+    <link rel="stylesheet" th:href="@{/css/bootstrap.min.css(v=3)}">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css(v=3)}">
+    <link rel="stylesheet" th:href="@{/css/content.css(v=3)}">
+</head>
+<body>
+<div class="screen">
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo">💳</div>
+            <div>
+                <h1>信用卡违约预警系统</h1>
+                <p>REPAYMENT DELAY &nbsp;·&nbsp; RISK INDICATORS &nbsp;·&nbsp; DEFAULT EARLY-WARNING</p>
+            </div>
+        </div>
+        <div class="topnav">
+            <a th:href="@{/}">数据看板</a>
+            <a th:href="@{/clients}">客户风险</a>
+            <a th:href="@{/predict}">预警预测</a>
+            <a th:href="@{/admin}" class="active">后台管理</a>
+        </div>
+        <div class="clock">
+            <span id="date"></span>
+            <span class="time" id="time">--:--:--</span>
+            <span class="live"><span class="dot"></span>数据实时监控中</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="page-head">
+            <h2>数据导入</h2>
+            <span class="sub">上传 UCI 原始数据集（.xls）→ 自动校验 → 重建 t_client 表</span>
+            <a class="btn btn-ghost btn-sm" th:href="@{/admin}">← 返回后台</a>
+        </div>
+
+        <div class="detail-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="panel page-panel">
+                <div class="panel-hd"><i></i><h3>上传数据文件</h3></div>
+                <form class="form-dark" onsubmit="doImport(event)">
+                    <div class="mb-3">
+                        <label class="form-label">选择 .xls 文件</label>
+                        <input type="file" class="form-control form-control-sm" id="file" accept=".xls">
+                    </div>
+                    <button type="submit" class="btn btn-neon btn-sm">上传并导入</button>
+                    <span id="importStatus" style="margin-left:12px; color:#9fc3e2; font-size:13px;"></span>
+                </form>
+                <div class="alert-note p-2 mt-3">
+                    支持文件：原始 UCI 数据集 <b>default of credit card clients.xls</b>（含 30,000 条客户记录）。
+                    导入会<b>清空并重建</b> t_client 表，请在导入前确认数据备份。
+                </div>
+            </div>
+
+            <div class="panel page-panel">
+                <div class="panel-hd"><i></i><h3>数据格式说明</h3></div>
+                <table class="dtable">
+                    <tr><td class="muted" style="width:150px;">文件格式</td><td>.xls（Excel 97-2003）</td></tr>
+                    <tr><td class="muted">第 2 行表头</td>
+                        <td style="white-space:normal;">ID / LIMIT_BAL / SEX / EDUCATION / MARRIAGE / AGE / PAY_0~PAY_6 / BILL_AMT1~6 / PAY_AMT1~6 / default payment next month</td></tr>
+                    <tr><td class="muted">数据起始</td><td>第 3 行起每行一条客户记录</td></tr>
+                    <tr><td class="muted">字段范围</td><td style="white-space:normal;">全部为数值（还款状态 -2~8，账单/还款为整数金额）</td></tr>
+                </table>
+                <div class="mt-2" style="color:#6f8fb0; font-size:12px;">
+                    导入完成后：<a th:href="@{/}" style="color:#4dc9ff;">返回看板</a> 查看统计更新，模型无需重新训练。
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="footer">
+        <span>后台管理 · 数据导入</span>
+        <span>导入接口：POST /api/admin/import（multipart/form-data，字段名 file）</span>
+    </div>
+</div>
+<script th:src="@{/js/page.js(v=3)}"></script>
+<script>
+    function doImport(e) {
+        e.preventDefault();
+        const f = document.getElementById('file').files[0];
+        if (!f) { document.getElementById('importStatus').textContent = '请先选择 .xls 文件'; return; }
+        const st = document.getElementById('importStatus');
+        st.textContent = '导入中，请稍候…';
+        const fd = new FormData();
+        fd.append('file', f);
+        fetch('/api/admin/import', {method: 'POST', body: fd})
+            .then(r => r.json())
+            .then(j => {
+                if (j.ok) {
+                    st.style.color = '#7cffcb';
+                    st.textContent = '导入成功：共 ' + j.total + ' 行，违约 ' + j.bad + ' 行（跳过 ' + j.skipped + ' 行）';
+                } else {
+                    st.style.color = '#ff7b7b';
+                    st.textContent = j.error || '导入失败';
+                }
+            })
+            .catch(e => {
+                st.style.color = '#ff7b7b';
+                st.textContent = '导入失败：' + e;
+            });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>后台管理 - 信用卡违约预警系统</title>
+    <link rel="stylesheet" th:href="@{/css/bootstrap.min.css(v=3)}">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css(v=3)}">
+    <link rel="stylesheet" th:href="@{/css/content.css(v=3)}">
+</head>
+<body>
+<div class="screen">
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo">💳</div>
+            <div>
+                <h1>信用卡违约预警系统</h1>
+                <p>REPAYMENT DELAY &nbsp;·&nbsp; RISK INDICATORS &nbsp;·&nbsp; DEFAULT EARLY-WARNING</p>
+            </div>
+        </div>
+        <div class="topnav">
+            <a th:href="@{/}">数据看板</a>
+            <a th:href="@{/clients}">客户风险</a>
+            <a th:href="@{/predict}">预警预测</a>
+            <a th:href="@{/admin}" class="active">后台管理</a>
+        </div>
+        <div class="clock">
+            <span id="date"></span>
+            <span class="time" id="time">--:--:--</span>
+            <span class="live"><span class="dot"></span>数据实时监控中</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="page-head">
+            <h2>后台管理 · 数据概览</h2>
+            <span class="sub">数据库 / 数据管理 / 模型信息</span>
+            <a class="btn btn-ghost btn-sm" th:href="@{/}">← 返回看板</a>
+        </div>
+
+        <div class="mini-grid">
+            <div class="mini-card"><div class="k">客户总数</div>
+                <div class="v" th:text="${summary.total}">0</div></div>
+            <div class="mini-card"><div class="k">违约客户</div>
+                <div class="v" style="color:#ff7b7b; text-shadow:0 0 12px rgba(255,123,123,.3);" th:text="${summary.bad}">0</div></div>
+            <div class="mini-card"><div class="k">违约率</div>
+                <div class="v" th:text="${summary.defaultRate} + '%'">0%</div></div>
+            <div class="mini-card"><div class="k">模型 AUC</div>
+                <div class="v cyan" th:text="${summary.metrics['auc']}">0.74</div></div>
+        </div>
+
+        <div class="detail-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="panel page-panel">
+                <div class="panel-hd"><i></i><h3>数据库信息</h3></div>
+                <table class="dtable">
+                    <tr><td class="muted" style="width:140px;">MySQL 版本</td><td th:text="${summary.dbVersion}">-</td></tr>
+                    <tr><td class="muted">数据库名</td><td th:text="${summary.dbName}">-</td></tr>
+                    <tr><td class="muted">数据表</td><td th:text="${summary.tableName} + '（客户数据）'">-</td></tr>
+                    <tr><td class="muted">表行数</td><td th:text="${summary.total} + ' 行'">-</td></tr>
+                    <tr><td class="muted">服务器时间</td><td th:text="${summary.serverTime}">-</td></tr>
+                </table>
+                <div class="mt-3">
+                    <a class="btn btn-ghost btn-sm" th:href="@{/admin/clients}">客户数据管理</a>
+                    <a class="btn btn-ghost btn-sm" th:href="@{/admin/import}">数据导入</a>
+                </div>
+            </div>
+
+            <div class="panel page-panel">
+                <div class="panel-hd"><i></i><h3>预警模型信息</h3></div>
+                <table class="dtable">
+                    <tr><td class="muted" style="width:140px;">算法</td><td th:text="${summary.algorithm}">-</td></tr>
+                    <tr><td class="muted">准确率 ACC</td><td th:text="${summary.metrics['accuracy']}">-</td></tr>
+                    <tr><td class="muted">精确率 P</td><td th:text="${summary.metrics['precision']}">-</td></tr>
+                    <tr><td class="muted">召回率 R</td><td th:text="${summary.metrics['recall']}">-</td></tr>
+                    <tr><td class="muted">F1</td><td th:text="${summary.metrics['f1']}">-</td></tr>
+                    <tr><td class="muted">AUC</td><td th:text="${summary.metrics['auc']}">-</td></tr>
+                    <tr><td class="muted">风险阈值</td>
+                        <td th:text="'中 ≥ ' + ${summary.thresholds['medium']} + ' · 高 ≥ ' + ${summary.thresholds['high']}">-</td></tr>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div class="footer">
+        <span>后台管理 · credit_default / t_client</span>
+        <span>修改数据后请到「客户风险」「预警预测」验证效果</span>
+    </div>
+</div>
+<script th:src="@{/js/page.js(v=3)}"></script>
+</body>
+</html>

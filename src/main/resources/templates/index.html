@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>信用卡违约预警 · 数据可视化大屏</title>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css(v=3)}">
+</head>
+<body>
+<div class="screen">
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo">💳</div>
+            <div>
+                <h1>信用卡违约预警系统</h1>
+                <p>REPAYMENT DELAY &nbsp;·&nbsp; RISK INDICATORS &nbsp;·&nbsp; DEFAULT EARLY-WARNING</p>
+            </div>
+        <div class="topnav">
+            <a th:href="@{/}" class="active">数据看板</a>
+            <a th:href="@{/clients}">客户风险</a>
+            <a th:href="@{/predict}">预警预测</a>
+            <a th:href="@{/admin}">后台管理</a>
+        </div>        <div class="clock">
+            <span id="date"></span>
+            <span class="time" id="time">--:--:--</span>
+            <span class="live"><span class="dot"></span>数据实时监控中</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- KPI -->
+        <section class="kpis">
+            <div class="kpi" style="--c:#00e5ff">
+                <div class="label">👥 客户总数</div>
+                <div class="value" id="k-total">0</div>
+                <div class="sub">观察期样本量</div>
+            </div>
+            <div class="kpi" style="--c:#ff7b7b">
+                <div class="label">⚠️ 违约客户</div>
+                <div class="value" id="k-bad">0</div>
+                <div class="sub">下月违约客户数</div>
+            </div>
+            <div class="kpi" style="--c:#ffd166">
+                <div class="label">📉 违约率</div>
+                <div class="value" id="k-rate">0<small>%</small></div>
+                <div class="sub">违约客户占比</div>
+            </div>
+            <div class="kpi" style="--c:#4dc9ff">
+                <div class="label">💰 平均信用额度</div>
+                <div class="value" id="k-limit">0</div>
+                <div class="sub">单位：元</div>
+            </div>
+            <div class="kpi" style="--c:#7cffcb">
+                <div class="label">🎂 平均年龄</div>
+                <div class="value" id="k-age">0<small>岁</small></div>
+                <div class="sub">客户年龄均值</div>
+            </div>
+            <div class="kpi" style="--c:#b388ff">
+                <div class="label">🎯 模型 AUC</div>
+                <div class="value" id="k-auc">0.000</div>
+                <div class="sub">逻辑回归预警模型</div>
+            </div>
+        </section>
+
+        <!-- 延迟行为 → 风险 -->
+        <section class="row2">
+            <div class="panel">
+                <div class="panel-hd"><i></i><h3>最大还款延迟月数 → 违约率</h3><span class="tag">延迟越久 · 风险越高</span></div>
+                <div class="panel-bd"><div class="chart" id="chartMaxDelay"></div></div>
+            </div>
+            <div class="panel">
+                <div class="panel-hd"><i></i><h3>逾期月份数 → 违约率</h3><span class="tag">近 6 个月</span></div>
+                <div class="panel-bd"><div class="chart" id="chartDelayMonths"></div></div>
+            </div>
+            <div class="panel">
+                <div class="panel-hd"><i></i><h3>最近月份还款状态分布</h3><span class="tag">-2 无消费 · -1 按时 · 1~8 延迟</span></div>
+                <div class="panel-bd"><div class="chart" id="chartPay0"></div></div>
+            </div>
+        </section>
+
+        <!-- 客群特征 + 特征重要性 -->
+        <section class="row3">
+            <div class="panel">
+                <div class="panel-hd"><i></i><h3>性别违约率</h3></div>
+                <div class="panel-bd"><div class="chart" id="chartSex"></div></div>
+            </div>
+            <div class="panel">
+                <div class="panel-hd"><i></i><h3>年龄分组违约率</h3></div>
+                <div class="panel-bd"><div class="chart" id="chartAge"></div></div>
+            </div>
+            <div class="panel">
+                <div class="panel-hd"><i></i><h3>模型特征重要性（Top 8）</h3><span class="tag">逻辑回归系数</span></div>
+                <div class="panel-bd"><div class="chart" id="chartFeat"></div></div>
+            </div>
+        </section>
+
+        <!-- 模型信息 -->
+        <section class="model-strip">
+            <div class="item"><div class="k">预警算法</div><div class="v" id="m-algo">-</div></div>
+            <div class="item"><div class="k">准确率 ACC</div><div class="v green" id="m-acc">-</div></div>
+            <div class="item"><div class="k">精确率 P</div><div class="v gold" id="m-pre">-</div></div>
+            <div class="item"><div class="k">召回率 R</div><div class="v gold" id="m-rec">-</div></div>
+            <div class="item"><div class="k">F1</div><div class="v gold" id="m-f1">-</div></div>
+            <div class="item"><div class="k">AUC / 风险阈值</div><div class="v red" id="m-auc">-</div></div>
+        </section>
+
+        <div class="footer">
+            <span>数据来源：UCI Credit Card Default（30,000 条客户记录） · 每 60 秒自动刷新</span>
+            <span>风险等级：违约概率 ≥ 0.5 高 · ≥ 0.2 中 · 其余 低</span>
+        </div>
+    </main>
+</div>
+
+<script th:src="@{/js/echarts.min.js(v=3)}"></script>
+<script>
+    /* ---------- 时钟 ---------- */
+    function tick() {
+        const d = new Date();
+        const p = n => String(n).padStart(2, '0');
+        const week = '日一二三四五六'[d.getDay()];
+        document.getElementById('date').textContent =
+            d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 周' + week;
+        document.getElementById('time').textContent =
+            p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    }
+    tick();
+    setInterval(tick, 1000);
+
+    /* ---------- 通用样式 ---------- */
+    const AXIS = {
+        line: { lineStyle: { color: 'rgba(120,170,220,.25)' } },
+        label: { color: '#8fb3d1', fontSize: 11 },
+        split: { lineStyle: { color: 'rgba(120,170,220,.08)' } }
+    };
+    const TOOLTIP = {
+        trigger: 'axis',
+        backgroundColor: 'rgba(8,24,46,.94)',
+        borderColor: 'rgba(0,229,255,.35)',
+        textStyle: { color: '#d7e6f5', fontSize: 12 }
+    };
+    const GRID = { left: 14, right: 18, top: 34, bottom: 8, containLabel: true };
+
+    function barGrad(c1, c2) {
+        return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: c1 }, { offset: 1, color: c2 }
+        ]);
+    }
+
+    function dualChart(el, cats, bars, line, barName, lineName) {
+        const chart = echarts.init(document.getElementById(el));
+        chart.setOption({
+            tooltip: TOOLTIP,
+            legend: {
+                top: 0, left: 'center', itemWidth: 12, itemHeight: 8, itemGap: 22,
+                textStyle: { color: '#9fc3e2', fontSize: 11 }
+            },
+            grid: { left: 10, right: 12, top: 52, bottom: 8, containLabel: true },
+            xAxis: {
+                type: 'category', data: cats,
+                axisLine: AXIS.line, axisLabel: AXIS.label, axisTick: { show: false }
+            },
+            yAxis: [
+                {
+                    type: 'value', name: '客户数', nameGap: 4,
+                    nameTextStyle: { color: '#6f8fb0', fontSize: 11, align: 'left' },
+                    axisLine: { show: false }, axisLabel: AXIS.label, splitLine: AXIS.split
+                },
+                {
+                    type: 'value', name: '违约率%', max: 100, nameGap: 4,
+                    nameTextStyle: { color: '#6f8fb0', fontSize: 11, align: 'right' },
+                    axisLine: { show: false }, axisLabel: AXIS.label, splitLine: { show: false }
+                }
+            ],
+            series: [
+                {
+                    name: barName, type: 'bar', data: bars, barWidth: '46%',
+                    itemStyle: {
+                        borderRadius: [4, 4, 0, 0],
+                        color: barGrad('rgba(0,229,255,.95)', 'rgba(0,120,255,.08)')
+                    }
+                },
+                {
+                    name: lineName, type: 'line', yAxisIndex: 1, data: line, smooth: true,
+                    symbol: 'circle', symbolSize: 7,
+                    lineStyle: { width: 2.5, color: '#ffd166', shadowColor: 'rgba(255,209,102,.6)', shadowBlur: 12 },
+                    itemStyle: { color: '#ffd166', borderColor: '#0a1830', borderWidth: 1.5 },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(255,209,102,.18)' },
+                            { offset: 1, color: 'rgba(255,209,102,0)' }
+                        ])
+                    }
+                }
+            ]
+        });
+        return chart;
+    }
+
+    function render(stats) {
+        const sum = stats.summary;
+        const model = stats.model;
+
+        /* KPI 数字动画（?anim=0 关闭动画，便于截图/调试） */
+        const noAnim = new URLSearchParams(location.search).get('anim') === '0';
+        const cards = [
+            ['k-total', sum.total, n => Math.round(n).toLocaleString('zh-CN')],
+            ['k-bad', sum.bad, n => Math.round(n).toLocaleString('zh-CN')],
+            ['k-rate', sum.defaultRate, n => n.toFixed(2) + '%'],
+            ['k-limit', sum.avg_limit, n => '¥' + Math.round(n).toLocaleString('zh-CN')],
+            ['k-age', sum.avg_age, n => n.toFixed(1) + ' 岁'],
+            ['k-auc', model.metrics.auc, n => n.toFixed(4)]
+        ];
+        cards.forEach(([id, val, fmt]) => {
+            const el = document.getElementById(id);
+            if (noAnim) { el.textContent = fmt(val); return; }
+            const start = performance.now();
+            const dur = 900;
+            (function anim(t) {
+                const k = Math.min(1, (t - start) / dur);
+                const e = 1 - Math.pow(1 - k, 3);
+                el.textContent = fmt(val * e);
+                if (k < 1) requestAnimationFrame(anim);
+            })(start);
+        });
+
+        document.getElementById('m-algo').textContent = '逻辑回归';
+        document.getElementById('m-acc').textContent = model.metrics.accuracy;
+        document.getElementById('m-pre').textContent = model.metrics.precision;
+        document.getElementById('m-rec').textContent = model.metrics.recall;
+        document.getElementById('m-f1').textContent = model.metrics.f1;
+        document.getElementById('m-auc').textContent = model.metrics.auc + ' / ' + model.thresholds.high;
+
+        /* 图1：最大延迟月数 */
+        dualChart('chartMaxDelay',
+            stats.byMaxDelay.map(x => '延迟' + x.d + '月'),
+            stats.byMaxDelay.map(x => x.n),
+            stats.byMaxDelay.map(x => x.rate),
+            '客户数', '违约率(%)');
+
+        /* 图2：逾期月份数 */
+        dualChart('chartDelayMonths',
+            stats.byDelayMonths.map(x => x.k + '个月'),
+            stats.byDelayMonths.map(x => x.n),
+            stats.byDelayMonths.map(x => x.rate),
+            '客户数', '违约率(%)');
+
+        /* 图3：还款状态分布 */
+        dualChart('chartPay0',
+            stats.byPay0.map(x => x.s),
+            stats.byPay0.map(x => x.n),
+            stats.byPay0.map(x => x.rate),
+            '客户数', '违约率(%)');
+
+        /* 图4：性别违约率 */
+        const sexChart = echarts.init(document.getElementById('chartSex'));
+        sexChart.setOption({
+            tooltip: TOOLTIP,
+            grid: { left: 20, right: 20, top: 30, bottom: 8, containLabel: true },
+            xAxis: {
+                type: 'category', data: stats.bySex.map(x => x.sex === 1 ? '男' : '女'),
+                axisLine: AXIS.line, axisLabel: { color: '#9fc3e2', fontSize: 13 }, axisTick: { show: false }
+            },
+            yAxis: [{
+                type: 'value', name: '违约率%', max: 30,
+                nameTextStyle: { color: '#6f8fb0', fontSize: 11 },
+                axisLine: { show: false }, axisLabel: AXIS.label, splitLine: AXIS.split
+            }],
+            series: [{
+                type: 'bar', barWidth: '34%', data: stats.bySex.map(x => x.rate),
+                itemStyle: {
+                    borderRadius: [6, 6, 0, 0],
+                    color: barGrad('rgba(255,209,102,.9)', 'rgba(255,120,80,.12)')
+                },
+                label: { show: true, position: 'top', color: '#ffd166', fontSize: 13, fontWeight: 700, formatter: '{c}%' }
+            }]
+        });
+
+        /* 图5：年龄分组违约率 */
+        const ageChart = echarts.init(document.getElementById('chartAge'));
+        ageChart.setOption({
+            tooltip: TOOLTIP,
+            grid: { left: 20, right: 20, top: 30, bottom: 8, containLabel: true },
+            xAxis: {
+                type: 'category', data: stats.byAgeGroup.map(x => x.g),
+                axisLine: AXIS.line, axisLabel: AXIS.label, axisTick: { show: false }
+            },
+            yAxis: [{
+                type: 'value', name: '违约率%', max: 30,
+                nameTextStyle: { color: '#6f8fb0', fontSize: 11 },
+                axisLine: { show: false }, axisLabel: AXIS.label, splitLine: AXIS.split
+            }],
+            series: [{
+                type: 'bar', barWidth: '46%', data: stats.byAgeGroup.map(x => x.rate),
+                itemStyle: {
+                    borderRadius: [5, 5, 0, 0],
+                    color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                        { offset: 0, color: 'rgba(124,255,203,.85)' },
+                        { offset: 1, color: 'rgba(0,229,255,.85)' }
+                    ])
+                },
+                label: { show: true, position: 'top', color: '#7cffcb', fontSize: 12, fontWeight: 700, formatter: '{c}%' }
+            }]
+        });
+
+        /* 图6：特征重要性（横向条形） */
+        const feats = (model.topFeatures || []).slice().sort((a, b) => a.abs - b.abs);
+        const featChart = echarts.init(document.getElementById('chartFeat'));
+        featChart.setOption({
+            tooltip: {
+                trigger: 'axis', axisPointer: { type: 'shadow' },
+                backgroundColor: 'rgba(8,24,46,.94)', borderColor: 'rgba(0,229,255,.35)',
+                textStyle: { color: '#d7e6f5' }
+            },
+            grid: { left: 8, right: 46, top: 8, bottom: 8, containLabel: true },
+            xAxis: { type: 'value', axisLine: { show: false }, axisLabel: AXIS.label, splitLine: AXIS.split },
+            yAxis: {
+                type: 'category', data: feats.map(f => f.name),
+                axisLine: { show: false }, axisLabel: { color: '#9fc3e2', fontSize: 11 }, axisTick: { show: false }
+            },
+            series: [{
+                type: 'bar', barWidth: '55%',
+                data: feats.map(f => ({
+                    value: f.abs,
+                    itemStyle: {
+                        color: f.coef >= 0
+                            ? barGrad('rgba(255,123,123,.9)', 'rgba(255,90,60,.15)')
+                            : barGrad('rgba(124,255,203,.9)', 'rgba(0,229,255,.15)'),
+                        borderRadius: [0, 4, 4, 0]
+                    }
+                })),
+                label: { show: true, position: 'right', color: '#9fc3e2', fontSize: 11, formatter: p => feats[p.dataIndex].coef }
+            }]
+        });
+
+        window.addEventListener('resize', () => {
+            ['chartMaxDelay', 'chartDelayMonths', 'chartPay0', 'chartSex', 'chartAge', 'chartFeat']
+                .forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); });
+        });
+    }
+
+    function load() { fetch('/api/stats').then(r => r.json()).then(render); }
+    load();
+    setInterval(load, 60000);
+</script>
+</body>
+</html>

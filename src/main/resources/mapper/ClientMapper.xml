@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huike.creditrisk.mapper.ClientMapper">
+
+    <sql id="filterWhere">
+        <where>
+            <if test="sex != null">AND sex = #{sex}</if>
+            <if test="education != null">AND education = #{education}</if>
+            <if test="minAge != null">AND age &gt;= #{minAge}</if>
+            <if test="maxAge != null">AND age &lt;= #{maxAge}</if>
+            <if test="minDelay != null">
+                AND GREATEST(pay_0, pay_2, pay_3, pay_4, pay_5, pay_6) &gt;= #{minDelay}
+            </if>
+            <if test="defaultFlag != null">AND default_flag = #{defaultFlag}</if>
+        </where>
+    </sql>
+
+    <select id="selectPage" resultType="com.huike.creditrisk.pojo.Client">
+        SELECT * FROM t_client
+        <include refid="filterWhere"/>
+        ORDER BY id
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*) FROM t_client
+        <include refid="filterWhere"/>
+    </select>
+
+    <select id="selectById" resultType="com.huike.creditrisk.pojo.Client">
+        SELECT * FROM t_client WHERE id = #{id}
+    </select>
+
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM t_client WHERE id = #{id}
+    </delete>
+
+    <select id="summary" resultType="map">
+        SELECT COUNT(*) AS total,
+               SUM(default_flag) AS bad,
+               ROUND(AVG(limit_bal), 0) AS avg_limit,
+               ROUND(AVG(age), 1) AS avg_age
+        FROM t_client
+    </select>
+
+    <select id="byMaxDelay" resultType="map">
+        SELECT GREATEST(pay_0, pay_2, pay_3, pay_4, pay_5, pay_6) AS d,
+               COUNT(*) AS n, SUM(default_flag) AS bad
+        FROM t_client
+        GROUP BY d
+        ORDER BY d
+    </select>
+
+    <select id="byDelayMonths" resultType="map">
+        SELECT ((pay_0 &gt; 0) + (pay_2 &gt; 0) + (pay_3 &gt; 0) + (pay_4 &gt; 0) + (pay_5 &gt; 0) + (pay_6 &gt; 0)) AS k,
+               COUNT(*) AS n, SUM(default_flag) AS bad
+        FROM t_client
+        GROUP BY k
+        ORDER BY k
+    </select>
+
+    <select id="bySex" resultType="map">
+        SELECT sex, COUNT(*) AS n, SUM(default_flag) AS bad
+        FROM t_client
+        GROUP BY sex
+        ORDER BY sex
+    </select>
+
+    <select id="byAgeGroup" resultType="map">
+        SELECT CASE
+                 WHEN age &lt; 25 THEN '25岁以下'
+                 WHEN age &lt; 35 THEN '25-34岁'
+                 WHEN age &lt; 45 THEN '35-44岁'
+                 WHEN age &lt; 55 THEN '45-54岁'
+                 ELSE '55岁以上'
+               END AS g,
+               COUNT(*) AS n, SUM(default_flag) AS bad
+        FROM t_client
+        GROUP BY g
+        ORDER BY MIN(age)
+    </select>
+
+    <select id="byPay0" resultType="map">
+        SELECT pay_0 AS s, COUNT(*) AS n, SUM(default_flag) AS bad
+        FROM t_client
+        GROUP BY pay_0
+        ORDER BY pay_0
+    </select>
+</mapper>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>客户详情 - 信用卡违约预警系统</title>
+    <link rel="stylesheet" th:href="@{/css/bootstrap.min.css(v=3)}">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css(v=3)}">
+    <link rel="stylesheet" th:href="@{/css/content.css(v=3)}">
+</head>
+<body>
+<div class="screen">
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo">💳</div>
+            <div>
+                <h1>信用卡违约预警系统</h1>
+                <p>REPAYMENT DELAY &nbsp;·&nbsp; RISK INDICATORS &nbsp;·&nbsp; DEFAULT EARLY-WARNING</p>
+            </div>
+        <div class="topnav">
+            <a th:href="@{/}">数据看板</a>
+            <a th:href="@{/clients}" class="active">客户风险</a>
+            <a th:href="@{/predict}">预警预测</a>
+            <a th:href="@{/admin}">后台管理</a>
+        </div>        <div class="clock">
+            <span id="date"></span>
+            <span class="time" id="time">--:--:--</span>
+            <span class="live"><span class="dot"></span>数据实时监控中</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="page-head">
+            <h2>
+                客户 #<span th:text="${cr.client.id}">1</span>
+                <span class="badge align-middle"
+                      th:classappend="${cr.risk.riskLevel == '高' ? 'bg-danger' : (cr.risk.riskLevel == '中' ? 'bg-warning text-dark' : 'bg-success')}"
+                      th:text="'风险等级：' + ${cr.risk.riskLevel}">-</span>
+            </h2>
+            <span class="sub">还款延迟行为 · 风险指标 · 违约预警</span>
+            <a class="btn btn-ghost btn-sm" th:href="@{/clients}">← 返回列表</a>
+        </div>
+
+        <div class="detail-grid">
+            <!-- 预警结果 -->
+            <div class="panel page-panel">
+                <div class="panel-hd"><i></i><h3>违约预警结果</h3></div>
+                <div class="res-wrap" th:with="p=${cr.risk.probability}">
+                    <span class="res-level"
+                          th:classappend="${cr.risk.riskLevel == '高' ? 'lvl-high' : (cr.risk.riskLevel == '中' ? 'lvl-mid' : 'lvl-low')}"
+                          th:text="'风险等级：' + ${cr.risk.riskLevel}">-</span>
+                    <div class="res-num"
+                         th:classappend="${cr.risk.riskLevel == '高' ? 'lvl-high' : (cr.risk.riskLevel == '中' ? 'lvl-mid' : 'lvl-low')}"
+                         th:text="${#numbers.formatDecimal(cr.risk.probability * 100, 1, 1)} + '%'">0%</div>
+                    <div class="res-sub">预测违约概率</div>
+                    <div class="res-bar">
+                        <div th:classappend="${cr.risk.riskLevel == '高' ? 'bar-high' : (cr.risk.riskLevel == '中' ? 'bar-mid' : 'bar-low')}"
+                             th:style="'width:' + ${#numbers.formatDecimal(cr.risk.probability * 100, 1, 1)} + '%'"></div>
+                    </div>
+                    <div class="alert-note p-2 mb-3" th:text="${cr.risk.advice}">建议</div>
+                    <div class="res-factors text-start">
+                        <b>主要风险因素：</b>
+                        <ul class="ps-3 mb-0">
+                            <li th:each="f : ${cr.risk.topFactors}" th:text="${f}">因素</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：指标 + 明细 -->
+            <div style="display:flex; flex-direction:column; gap:14px; min-height:0;">
+                <div class="mini-grid">
+                    <div class="mini-card"><div class="k">最大延迟月数</div><div class="v" th:text="${cr.risk.indicators['maxDelay']}">0</div></div>
+                    <div class="mini-card"><div class="k">逾期月份数</div><div class="v" th:text="${cr.risk.indicators['delayMonths']}">0</div></div>
+                    <div class="mini-card"><div class="k">平均延迟月数</div><div class="v" th:text="${cr.risk.indicators['avgDelay']}">0</div></div>
+                    <div class="mini-card"><div class="k">额度使用率</div>
+                        <div class="v cyan" th:text="${#numbers.formatDecimal(cr.risk.indicators['utilRatio'] * 100, 1, 0)} + '%'">0%</div></div>
+                </div>
+
+                <div class="panel page-panel">
+                    <div class="panel-hd"><i></i><h3>近 6 个月还款状态</h3>
+                        <span class="tag">-2 无消费 · -1 按时 · 0 最低还款 · 1~8 延迟月数</span></div>
+                    <table class="table table-bordered text-center align-middle mb-0 small">
+                        <thead class="table-light">
+                        <tr><th>4月</th><th>5月</th><th>6月</th><th>7月</th><th>8月</th><th>9月</th></tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td th:classappend="${cr.client.pay6 >= 3 ? 'table-danger' : (cr.client.pay6 >= 1 ? 'table-warning' : (cr.client.pay6 >= 0 ? 'table-info' : 'table-success'))}" th:text="${cr.client.pay6}"></td>
+                            <td th:classappend="${cr.client.pay5 >= 3 ? 'table-danger' : (cr.client.pay5 >= 1 ? 'table-warning' : (cr.client.pay5 >= 0 ? 'table-info' : 'table-success'))}" th:text="${cr.client.pay5}"></td>
+                            <td th:classappend="${cr.client.pay4 >= 3 ? 'table-danger' : (cr.client.pay4 >= 1 ? 'table-warning' : (cr.client.pay4 >= 0 ? 'table-info' : 'table-success'))}" th:text="${cr.client.pay4}"></td>
+                            <td th:classappend="${cr.client.pay3 >= 3 ? 'table-danger' : (cr.client.pay3 >= 1 ? 'table-warning' : (cr.client.pay3 >= 0 ? 'table-info' : 'table-success'))}" th:text="${cr.client.pay3}"></td>
+                            <td th:classappend="${cr.client.pay2 >= 3 ? 'table-danger' : (cr.client.pay2 >= 1 ? 'table-warning' : (cr.client.pay2 >= 0 ? 'table-info' : 'table-success'))}" th:text="${cr.client.pay2}"></td>
+                            <td th:classappend="${cr.client.pay0 >= 3 ? 'table-danger' : (cr.client.pay0 >= 1 ? 'table-warning' : (cr.client.pay0 >= 0 ? 'table-info' : 'table-success'))}" th:text="${cr.client.pay0}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel page-panel" style="flex:1;">
+                    <div class="panel-hd"><i></i><h3>账单与还款对照（4~9 月）</h3></div>
+                    <div style="overflow:auto;">
+                        <table class="table table-sm table-bordered text-center align-middle mb-0 small">
+                            <thead class="table-light">
+                            <tr><th>月份</th><th>账单金额</th><th>还款金额</th><th>还款覆盖</th></tr>
+                            </thead>
+                            <tbody>
+                            <tr><td>4月</td><td th:text="'¥' + ${cr.client.billAmt6}">¥0</td><td th:text="'¥' + ${cr.client.payAmt6}">¥0</td>
+                                <td th:text="${#numbers.formatDecimal(cr.client.payAmt6 * 100.0 / (cr.client.billAmt6 > 0 ? cr.client.billAmt6 : 1), 1, 0)} + '%'">0%</td></tr>
+                            <tr><td>5月</td><td th:text="'¥' + ${cr.client.billAmt5}">¥0</td><td th:text="'¥' + ${cr.client.payAmt5}">¥0</td>
+                                <td th:text="${#numbers.formatDecimal(cr.client.payAmt5 * 100.0 / (cr.client.billAmt5 > 0 ? cr.client.billAmt5 : 1), 1, 0)} + '%'">0%</td></tr>
+                            <tr><td>6月</td><td th:text="'¥' + ${cr.client.billAmt4}">¥0</td><td th:text="'¥' + ${cr.client.payAmt4}">¥0</td>
+                                <td th:text="${#numbers.formatDecimal(cr.client.payAmt4 * 100.0 / (cr.client.billAmt4 > 0 ? cr.client.billAmt4 : 1), 1, 0)} + '%'">0%</td></tr>
+                            <tr><td>7月</td><td th:text="'¥' + ${cr.client.billAmt3}">¥0</td><td th:text="'¥' + ${cr.client.payAmt3}">¥0</td>
+                                <td th:text="${#numbers.formatDecimal(cr.client.payAmt3 * 100.0 / (cr.client.billAmt3 > 0 ? cr.client.billAmt3 : 1), 1, 0)} + '%'">0%</td></tr>
+                            <tr><td>8月</td><td th:text="'¥' + ${cr.client.billAmt2}">¥0</td><td th:text="'¥' + ${cr.client.payAmt2}">¥0</td>
+                                <td th:text="${#numbers.formatDecimal(cr.client.payAmt2 * 100.0 / (cr.client.billAmt2 > 0 ? cr.client.billAmt2 : 1), 1, 0)} + '%'">0%</td></tr>
+                            <tr><td>9月</td><td th:text="'¥' + ${cr.client.billAmt1}">¥0</td><td th:text="'¥' + ${cr.client.payAmt1}">¥0</td>
+                                <td th:text="${#numbers.formatDecimal(cr.client.payAmt1 * 100.0 / (cr.client.billAmt1 > 0 ? cr.client.billAmt1 : 1), 1, 0)} + '%'">0%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2" style="color:#6f8fb0; font-size:13px;">
+                        基础信息：性别 <b style="color:#cfe8ff" th:text="${cr.client.sex == 1 ? '男' : '女'}">-</b>
+                        · 教育 <b style="color:#cfe8ff" th:text="${cr.client.education == 1 ? '研究生' : (cr.client.education == 2 ? '大学' : (cr.client.education == 3 ? '高中' : '其他'))}">-</b>
+                        · 婚姻 <b style="color:#cfe8ff" th:text="${cr.client.marriage == 1 ? '已婚' : (cr.client.marriage == 2 ? '单身' : '其他')}">-</b>
+                        · 年龄 <b style="color:#cfe8ff" th:text="${cr.client.age}">-</b> 岁
+                        · 信用额度 <b style="color:#cfe8ff" th:text="'¥' + ${cr.client.limitBal}">-</b>
+                        · 实际结果：<b th:if="${cr.client.defaultFlag == 1}" style="color:#ff7b7b;">违约</b>
+                        <b th:if="${cr.client.defaultFlag == 0}" style="color:#7cffcb;">正常</b>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="footer">
+        <span>数据来源：UCI Credit Card Default · 客户 #<span th:text="${cr.client.id}">1</span></span>
+        <span>模型：逻辑回归 · AUC <span th:text="${metrics['auc']}">0.74</span></span>
+    </div>
+</div>
+<script th:src="@{/js/page.js(v=3)}"></script>
+</body>
+</html>

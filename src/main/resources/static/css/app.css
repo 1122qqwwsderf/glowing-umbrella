@@ -1,0 +1,11 @@
+body {
+    background: #f4f6f9;
+    font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+.navbar .nav-link { color: #cfd8e3; }
+.navbar .nav-link.active { color: #fff; font-weight: 600; }
+.stat-card { border: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .06); }
+.stat-label { color: #7b8794; font-size: .8rem; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: #1f3a5f; }
+.card { border: none; }
+.table th { white-space: nowrap; }
